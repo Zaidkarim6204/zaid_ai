@@ -66,4 +66,11 @@ To run this project locally, you will need to provide your own API keys.
 5.  *Run the app:*
     bash
     streamlit run app.py
+
+    ### 🚀 Future Roadmap (In Progress)
+To scale this project into a production-grade AI system, the following features are planned:
+* **Memory Optimization:** Integrating a **Vector Database (ChromaDB)** to store long-term conversation history (RAG).
+* **Containerization:** Dockerizing the application for scalable cloud deployment.
+* **CI/CD:** Implementing GitHub Actions for automated testing and MLOps pipelines.
+
     
