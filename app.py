@@ -14,7 +14,7 @@ st.set_page_config(
 )
 
 # ============================================================
-# CUSTOM STYLING
+# CUSTOM STYLING (gives the app a polished, "product" feel)
 # ============================================================
 st.markdown("""
 <style>
@@ -154,9 +154,49 @@ system_instruction = """You are a helpful and powerful AI assistant. Your goal i
 For any question about current events, real-time information, or to find links not in your knowledge base, you MUST use your web search tool.
 If a user asks for a link to a specific application, you should use the 'get_link' tool first."""
 
-# FIXED MODEL NAME: Using 'gemini-1.5-flash' with correct tool execution
+# Models to try, in order of preference. Google periodically retires older
+# model IDs (e.g. gemini-1.5-flash now 404s for many projects), so instead
+# of hardcoding one name we ask the API what's actually available for THIS
+# key and pick the best match. This keeps the app from breaking again the
+# next time a model gets deprecated.
+PREFERRED_MODELS = [
+    "models/gemini-2.5-flash",
+    "models/gemini-flash-latest",
+    "models/gemini-2.5-flash-lite",
+    "models/gemini-2.0-flash",
+    "models/gemini-1.5-flash",
+]
+
+
+@st.cache_resource(show_spinner=False)
+def resolve_model_name():
+    """Ask the Gemini API which models are actually usable for this key,
+    then pick the first one from our preference list that's available.
+    Falls back to the first available generateContent-capable model if
+    none of our preferred names match, and to 'gemini-2.5-flash' if the
+    listing call itself fails."""
+    try:
+        available = [
+            m.name for m in genai.list_models()
+            if "generateContent" in m.supported_generation_methods
+        ]
+    except Exception:
+        return "gemini-2.5-flash"
+
+    for preferred in PREFERRED_MODELS:
+        if preferred in available:
+            return preferred.replace("models/", "")
+
+    if available:
+        return available[0].replace("models/", "")
+
+    return "gemini-2.5-flash"
+
+
+ACTIVE_MODEL_NAME = resolve_model_name()
+
 model = genai.GenerativeModel(
-    model_name='gemini-1.5-flash',
+    model_name=ACTIVE_MODEL_NAME,
     tools=[get_live_weather, perform_web_search, get_link],
     system_instruction=system_instruction
 )
@@ -169,7 +209,7 @@ if "messages" not in st.session_state:
         {"role": "assistant", "content": "👋 Hey! I'm your AI Assistant. Ask me anything — I can check live weather, search the web, or grab app links for you."}
     ]
 
-# Avatars
+# Avatars for a more distinctive chat feel
 AVATARS = {
     "user": "🧑‍💻",
     "assistant": "🪐"
@@ -188,7 +228,7 @@ with st.sidebar:
     st.markdown("🔗 **Smart Links** — instant download links for known apps")
     st.markdown("---")
     st.markdown("### ⚙️ Model")
-    st.markdown("`gemini-1.5-flash`")
+    st.markdown(f"`{ACTIVE_MODEL_NAME}` (auto-selected)")
     st.markdown("---")
     if st.button("🗑️ Clear Conversation", use_container_width=True):
         st.session_state.chat = model.start_chat(enable_automatic_function_calling=True)
@@ -203,12 +243,12 @@ with st.sidebar:
 st.markdown('<div class="hero-title">🪐 Zaid AI Assistant</div>', unsafe_allow_html=True)
 st.markdown('<div class="hero-subtitle">Real-time answers, live weather & smart links — all in one chat</div>', unsafe_allow_html=True)
 
-st.markdown("""
+st.markdown(f"""
 <div class="chip-row">
     <div class="chip">🌦️ Live Weather</div>
     <div class="chip">🔍 Web Search</div>
     <div class="chip">🔗 App Links</div>
-    <div class="chip">⚡ Gemini 1.5 Flash</div>
+    <div class="chip">⚡ {ACTIVE_MODEL_NAME}</div>
 </div>
 """, unsafe_allow_html=True)
 
@@ -232,13 +272,7 @@ if prompt := st.chat_input("Ask me anything... 🚀"):
         with st.spinner("✨ Thinking..."):
             try:
                 response = st.session_state.chat.send_message(prompt)
-                
-                # Handling function execution responses safely
-                if response.text:
-                    final_response = response.text
-                else:
-                    final_response = "I completed the action successfully!"
-                    
+                final_response = response.text
                 message_placeholder.markdown(final_response)
             except Exception as e:
                 final_response = f"⚠️ An error occurred: {e}"
