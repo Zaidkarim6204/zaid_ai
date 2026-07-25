@@ -1,41 +1,115 @@
 import streamlit as st
 import google.generativeai as genai
-import os
 import requests
-import smtplib
-from email.mime.text import MIMEText
 from tavily import TavilyClient
 
-# --- Page Configuration ---
+# ============================================================
+# PAGE CONFIGURATION
+# ============================================================
 st.set_page_config(
-    page_title="Zaid's AI Assistant",
-    page_icon="🤖",
-    layout="centered"
+    page_title="Zaid AI | Intelligent Assistant",
+    page_icon="🪐",
+    layout="centered",
+    initial_sidebar_state="expanded"
 )
 
-# --- API Key Configuration ---
+# ============================================================
+# CUSTOM STYLING (gives the app a polished, "product" feel)
+# ============================================================
+st.markdown("""
+<style>
+    /* Overall app background */
+    .stApp {
+        background: linear-gradient(135deg, #0f0c29 0%, #302b63 50%, #24243e 100%);
+    }
+
+    /* Title */
+    .hero-title {
+        text-align: center;
+        font-size: 2.6rem;
+        font-weight: 800;
+        background: linear-gradient(90deg, #00c6ff, #a855f7, #ec4899);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        margin-bottom: 0px;
+    }
+    .hero-subtitle {
+        text-align: center;
+        color: #c9c9d9;
+        font-size: 1rem;
+        margin-top: -5px;
+        margin-bottom: 20px;
+    }
+
+    /* Capability chips */
+    .chip-row {
+        display: flex;
+        justify-content: center;
+        gap: 10px;
+        flex-wrap: wrap;
+        margin-bottom: 25px;
+    }
+    .chip {
+        background: rgba(255,255,255,0.08);
+        border: 1px solid rgba(255,255,255,0.15);
+        border-radius: 20px;
+        padding: 6px 16px;
+        font-size: 0.85rem;
+        color: #f0f0f5;
+        backdrop-filter: blur(6px);
+    }
+
+    /* Chat bubbles */
+    div[data-testid="stChatMessage"] {
+        border-radius: 16px;
+        padding: 6px 4px;
+        margin-bottom: 8px;
+    }
+
+    /* Sidebar */
+    section[data-testid="stSidebar"] {
+        background: linear-gradient(180deg, #1a1a2e 0%, #16213e 100%);
+    }
+    section[data-testid="stSidebar"] * {
+        color: #eaeaf0 !important;
+    }
+
+    /* Input box */
+    .stChatInput textarea {
+        border-radius: 14px !important;
+    }
+
+    footer {visibility: hidden;}
+</style>
+""", unsafe_allow_html=True)
+
+# ============================================================
+# API KEY CONFIGURATION
+# ============================================================
 try:
     GOOGLE_API_KEY = st.secrets["GOOGLE_API_KEY"]
     OPENWEATHER_API_KEY = st.secrets["OPENWEATHER_API_KEY"]
     TAVILY_API_KEY = st.secrets["TAVILY_API_KEY"]
-    SENDER_EMAIL = st.secrets["SENDER_EMAIL"]
-    EMAIL_PASSWORD = st.secrets["EMAIL_PASSWORD"]
-    
+
     genai.configure(api_key=GOOGLE_API_KEY)
     tavily_client = TavilyClient(api_key=TAVILY_API_KEY)
-    
+
 except (FileNotFoundError, KeyError) as e:
-    st.error(f"Secrets file or key not found: {e}. Please check your .streamlit/secrets.toml file.")
+    st.error(f"🔑 Secrets file or key not found: {e}. Please check your .streamlit/secrets.toml file.")
     st.stop()
 
-# --- Link Knowledge Base ---
+# ============================================================
+# KNOWLEDGE BASE
+# ============================================================
 LINK_KNOWLEDGE_BASE = {
     "capcut": "https://www.capcut.com/",
     "vs code": "https://code.visualstudio.com/download",
     "anaconda": "https://www.anaconda.com/download"
 }
 
-# --- Tool Functions ---
+# ============================================================
+# TOOL FUNCTIONS
+# ============================================================
 def get_link(app_name: str):
     """
     Provides a download or website link for a specific, known application.
@@ -44,10 +118,10 @@ def get_link(app_name: str):
     app_key = app_name.lower().strip()
     if app_key in LINK_KNOWLEDGE_BASE:
         url = LINK_KNOWLEDGE_BASE[app_key]
-        # Return a proper Markdown formatted link for Streamlit
         return f"Here is the link for {app_name}: [{url}]({url})"
     else:
         return f"Sorry, I don't have a pre-defined link for {app_name}. You can ask me to search the web for it."
+
 
 def get_live_weather(city: str):
     """Fetches the current weather for a given city."""
@@ -60,6 +134,7 @@ def get_live_weather(city: str):
     except requests.exceptions.RequestException as ex:
         return f"Could not fetch weather data. Error: {ex}"
 
+
 def perform_web_search(query: str):
     """
     Use this tool to get real-time information from the internet, or to find links not in the knowledge base.
@@ -70,62 +145,96 @@ def perform_web_search(query: str):
         return "\n".join([f"- {res['content']}" for res in response['results']])
     except Exception as ex:
         return f"Could not perform web search. Error: {ex}"
-        
-def send_email(to_address: str, subject: str, body: str):
-    """Sends an email from the configured sender address."""
-    try:
-        msg = MIMEText(body)
-        msg['Subject'] = subject
-        msg['From'] = SENDER_EMAIL
-        msg['To'] = to_address
 
-        with smtplib.SMTP_SSL('smtp.gmail.com', 465) as smtp_server:
-            smtp_server.login(SENDER_EMAIL, EMAIL_PASSWORD)
-            smtp_server.sendmail(SENDER_EMAIL, to_address, msg.as_string())
-        return f"Email successfully sent to {to_address}."
-    except Exception as ex:
-        return f"Failed to send email. Error: {ex}"
 
-# --- Model and Chat Configuration ---
-system_instruction = """You are a helpful and powerful AI assistant. Your goal is to provide accurate, up-to-date answers. 
+# ============================================================
+# MODEL AND CHAT CONFIGURATION
+# ============================================================
+system_instruction = """You are a helpful and powerful AI assistant. Your goal is to provide accurate, up-to-date answers.
 For any question about current events, real-time information, or to find links not in your knowledge base, you MUST use your web search tool.
 If a user asks for a link to a specific application, you should use the 'get_link' tool first."""
 
 model = genai.GenerativeModel(
-    model_name='gemini-1.5-flash',
-    tools=[get_live_weather, perform_web_search, send_email, get_link],
+    model_name='gemini-2.5-flash',
+    tools=[get_live_weather, perform_web_search, get_link],
     system_instruction=system_instruction
 )
-chat = model.start_chat(enable_automatic_function_calling=True)
 
-# --- Main App UI ---
-st.title("🤖 Zaid's AI Assistant")
-st.caption("This chatbot can search the web, check live weather, send emails, and provide links.")
+if "chat" not in st.session_state:
+    st.session_state.chat = model.start_chat(enable_automatic_function_calling=True)
 
 if "messages" not in st.session_state:
-    st.session_state.messages = [{"role": "assistant", "content": "How can I help you today?"}]
+    st.session_state.messages = [
+        {"role": "assistant", "content": "👋 Hey! I'm your AI Assistant. Ask me anything — I can check live weather, search the web, or grab app links for you."}
+    ]
 
+# Avatars for a more distinctive chat feel
+AVATARS = {
+    "user": "🧑‍💻",
+    "assistant": "🪐"
+}
+
+# ============================================================
+# SIDEBAR
+# ============================================================
+with st.sidebar:
+    st.markdown("## 🪐 Zaid AI")
+    st.markdown("Your all-in-one intelligent assistant.")
+    st.markdown("---")
+    st.markdown("### 🧰 Capabilities")
+    st.markdown("🌦️ **Live Weather** — real-time conditions for any city")
+    st.markdown("🔍 **Web Search** — up-to-the-minute answers, powered by Tavily")
+    st.markdown("🔗 **Smart Links** — instant download links for known apps")
+    st.markdown("---")
+    st.markdown("### ⚙️ Model")
+    st.markdown("`gemini-2.5-flash`")
+    st.markdown("---")
+    if st.button("🗑️ Clear Conversation", use_container_width=True):
+        st.session_state.chat = model.start_chat(enable_automatic_function_calling=True)
+        st.session_state.messages = [
+            {"role": "assistant", "content": "👋 Fresh start! What can I help you with?"}
+        ]
+        st.rerun()
+
+# ============================================================
+# HEADER
+# ============================================================
+st.markdown('<div class="hero-title">🪐 Zaid AI Assistant</div>', unsafe_allow_html=True)
+st.markdown('<div class="hero-subtitle">Real-time answers, live weather & smart links — all in one chat</div>', unsafe_allow_html=True)
+
+st.markdown("""
+<div class="chip-row">
+    <div class="chip">🌦️ Live Weather</div>
+    <div class="chip">🔍 Web Search</div>
+    <div class="chip">🔗 App Links</div>
+    <div class="chip">⚡ Gemini 2.5 Flash</div>
+</div>
+""", unsafe_allow_html=True)
+
+# ============================================================
+# CHAT HISTORY DISPLAY
+# ============================================================
 for message in st.session_state.messages:
-    with st.chat_message(message["role"]):
+    with st.chat_message(message["role"], avatar=AVATARS.get(message["role"], "🤖")):
         st.markdown(message["content"])
 
-# --- Main Chat Logic ---
-if prompt := st.chat_input("Ask me anything..."):
+# ============================================================
+# MAIN CHAT LOGIC
+# ============================================================
+if prompt := st.chat_input("Ask me anything... 🚀"):
     st.session_state.messages.append({"role": "user", "content": prompt})
-    with st.chat_message("user"):
+    with st.chat_message("user", avatar=AVATARS["user"]):
         st.markdown(prompt)
 
-    with st.chat_message("assistant"):
+    with st.chat_message("assistant", avatar=AVATARS["assistant"]):
         message_placeholder = st.empty()
-        with st.spinner("Thinking..."):
+        with st.spinner("✨ Thinking..."):
             try:
-                response = chat.send_message(prompt)
-                
-                final_response = response.parts[-1].text
+                response = st.session_state.chat.send_message(prompt)
+                final_response = response.text
                 message_placeholder.markdown(final_response)
-                
             except Exception as e:
-                final_response = f"An error occurred: {e}"
+                final_response = f"⚠️ An error occurred: {e}"
                 message_placeholder.markdown(final_response)
 
     st.session_state.messages.append({"role": "assistant", "content": final_response})
