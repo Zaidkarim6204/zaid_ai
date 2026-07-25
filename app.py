@@ -154,43 +154,43 @@ system_instruction = """You are a helpful and powerful AI assistant. Your goal i
 For any question about current events, real-time information, or to find links not in your knowledge base, you MUST use your web search tool.
 If a user asks for a link to a specific application, you should use the 'get_link' tool first."""
 
-# Models to try, in order of preference. Google periodically retires older
-# model IDs (e.g. gemini-1.5-flash now 404s for many projects), so instead
-# of hardcoding one name we ask the API what's actually available for THIS
-# key and pick the best match. This keeps the app from breaking again the
-# next time a model gets deprecated.
+# Models to try, in order of preference. Google has been aggressively
+# retiring older model IDs for NEW API keys/projects specifically —
+# gemini-1.5-flash, and as of mid-2026 even gemini-2.5-flash/2.5-pro,
+# now 404 with "no longer available to new users" even though they still
+# show up in list_models(). So instead of trusting the model listing, we
+# actually test-call each candidate once and use the first one that works.
 PREFERRED_MODELS = [
-    "models/gemini-2.5-flash",
-    "models/gemini-flash-latest",
-    "models/gemini-2.5-flash-lite",
-    "models/gemini-2.0-flash",
-    "models/gemini-1.5-flash",
+    "gemini-flash-latest",       # self-updating alias — Google's recommended default
+    "gemini-3.5-flash",
+    "gemini-3.1-flash-lite",
+    "gemini-2.5-flash-lite",
+    "gemini-2.5-flash",
+    "gemini-2.0-flash",
 ]
 
 
 @st.cache_resource(show_spinner=False)
 def resolve_model_name():
-    """Ask the Gemini API which models are actually usable for this key,
-    then pick the first one from our preference list that's available.
-    Falls back to the first available generateContent-capable model if
-    none of our preferred names match, and to 'gemini-2.5-flash' if the
-    listing call itself fails."""
-    try:
-        available = [
-            m.name for m in genai.list_models()
-            if "generateContent" in m.supported_generation_methods
-        ]
-    except Exception:
-        return "gemini-2.5-flash"
-
-    for preferred in PREFERRED_MODELS:
-        if preferred in available:
-            return preferred.replace("models/", "")
-
-    if available:
-        return available[0].replace("models/", "")
-
-    return "gemini-2.5-flash"
+    """Actually test-call each candidate model (cheap, tiny prompt) and
+    return the first one that responds successfully. This is more
+    reliable than list_models(), which can list a model as 'available'
+    even though it 404s for new-user keys at generation time. Cached so
+    this only runs once per app instance, not on every rerun."""
+    for name in PREFERRED_MODELS:
+        try:
+            test_model = genai.GenerativeModel(model_name=name)
+            test_model.generate_content(
+                "Hi",
+                generation_config={"max_output_tokens": 5}
+            )
+            return name
+        except Exception:
+            continue
+    # If literally nothing worked, fall back to the recommended alias —
+    # the app will surface a clear error on first real message instead
+    # of failing silently here.
+    return "gemini-flash-latest"
 
 
 ACTIVE_MODEL_NAME = resolve_model_name()
