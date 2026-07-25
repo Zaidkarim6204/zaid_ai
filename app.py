@@ -154,8 +154,9 @@ system_instruction = """You are a helpful and powerful AI assistant. Your goal i
 For any question about current events, real-time information, or to find links not in your knowledge base, you MUST use your web search tool.
 If a user asks for a link to a specific application, you should use the 'get_link' tool first."""
 
+# FIXED: Using the active stable alias 'gemini-1.5-flash-latest'
 model = genai.GenerativeModel(
-    model_name='gemini-2.5-flash',
+    model_name='gemini-1.5-flash-latest',
     tools=[get_live_weather, perform_web_search, get_link],
     system_instruction=system_instruction
 )
@@ -187,7 +188,7 @@ with st.sidebar:
     st.markdown("🔗 **Smart Links** — instant download links for known apps")
     st.markdown("---")
     st.markdown("### ⚙️ Model")
-    st.markdown("`gemini-2.5-flash`")
+    st.markdown("`gemini-1.5-flash-latest`")
     st.markdown("---")
     if st.button("🗑️ Clear Conversation", use_container_width=True):
         st.session_state.chat = model.start_chat(enable_automatic_function_calling=True)
@@ -207,7 +208,7 @@ st.markdown("""
     <div class="chip">🌦️ Live Weather</div>
     <div class="chip">🔍 Web Search</div>
     <div class="chip">🔗 App Links</div>
-    <div class="chip">⚡ Gemini 2.5 Flash</div>
+    <div class="chip">⚡ Gemini Flash</div>
 </div>
 """, unsafe_allow_html=True)
 
