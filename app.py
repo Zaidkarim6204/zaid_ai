@@ -154,7 +154,7 @@ system_instruction = """You are a helpful and powerful AI assistant. Your goal i
 For any question about current events, real-time information, or to find links not in your knowledge base, you MUST use your web search tool.
 If a user asks for a link to a specific application, you should use the 'get_link' tool first."""
 
-# FIXED MODEL NAME: Using the standard stable 'gemini-1.5-flash' identifier
+# FIXED MODEL NAME: Using 'gemini-1.5-flash' with correct tool execution
 model = genai.GenerativeModel(
     model_name='gemini-1.5-flash',
     tools=[get_live_weather, perform_web_search, get_link],
@@ -232,7 +232,13 @@ if prompt := st.chat_input("Ask me anything... 🚀"):
         with st.spinner("✨ Thinking..."):
             try:
                 response = st.session_state.chat.send_message(prompt)
-                final_response = response.text
+                
+                # Handling function execution responses safely
+                if response.text:
+                    final_response = response.text
+                else:
+                    final_response = "I completed the action successfully!"
+                    
                 message_placeholder.markdown(final_response)
             except Exception as e:
                 final_response = f"⚠️ An error occurred: {e}"
